@@ -1,68 +1,24 @@
-//!
-//! Stylus Hello World
-//!
-//! The following contract implements the Counter example from Foundry.
-//!
-//! ```
-//! contract Counter {
-//!     uint256 public number;
-//!     function setNumber(uint256 newNumber) public {
-//!         number = newNumber;
-//!     }
-//!     function increment() public {
-//!         number++;
-//!     }
-//! }
-//! ```
-//!
-//! The program is ABI-equivalent with Solidity, which means you can call it from both Solidity and Rust.
-//! To do this, run `cargo stylus export-abi`.
-//!
-//! Note: this code is a template-only and has not been audited.
-//!
-
-// Allow `cargo stylus export-abi` to generate a main function.
 #![cfg_attr(not(feature = "export-abi"), no_main)]
 extern crate alloc;
-
 /// Import items from the SDK. The prelude contains common traits and macros.
-use stylus_sdk::{alloy_primitives::U256, prelude::*};
+use stylus_sdk::prelude::{entrypoint, public, sol_storage};
 
-// Define some persistent storage using the Solidity ABI.
-// `Counter` will be the entrypoint.
 sol_storage! {
     #[entrypoint]
-    pub struct Counter {
-        uint256 number;
+    struct Database{
+        string data;
     }
 }
 
-/// Declare that `Counter` is a contract with the following external methods.
 #[public]
-impl Counter {
-    /// Gets the number from storage.
-    pub fn number(&self) -> U256 {
-        self.number.get()
+impl Database {
+    pub fn push_message(&mut self, new_message: String) {
+        self.data.set_str(new_message);
     }
 
-    /// Sets a number in storage to a user-specified value.
-    pub fn set_number(&mut self, new_number: U256) {
-        self.number.set(new_number);
-    }
-
-    /// Sets a number in storage to a user-specified value.
-    pub fn mul_number(&mut self, new_number: U256) {
-        self.number.set(new_number * self.number.get());
-    }
-
-    /// Sets a number in storage to a user-specified value.
-    pub fn add_number(&mut self, new_number: U256) {
-        self.number.set(new_number + self.number.get());
-    }
-
-    /// Increments `number` and updates its value in storage.
-    pub fn increment(&mut self) {
-        let number = self.number.get();
-        self.set_number(number + U256::from(1));
+    pub fn data(&mut self) -> String {
+        self.data.get_string()
     }
 }
+
+// cargo stylus cache bid ea9a0bb706c3f6701a5c7ad78f0663eef638ddd6
