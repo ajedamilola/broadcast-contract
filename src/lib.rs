@@ -2,39 +2,46 @@
 extern crate alloc;
 
 /// Import items from the SDK. The prelude contains common traits and macros.
-use stylus_sdk::{alloy_primitives::*, block, msg, prelude::*};
+use stylus_sdk::{alloy_primitives::*, msg, prelude::*};
 
 sol_storage! {
     pub struct Message{
         address sender;
         string content;
         string name;
-        uint time_stamp;
+        string replying;
+        uint128 time_stamp;
+        mapping(U8=>string) stars;
     }
 
     #[entrypoint]
     pub struct BroadCastApp{
-        mapping(U256=>Message) data;
-        uint number_of_messages;
-        string message;
+        mapping(U64=>Message) data;
+        uint64 number_of_messages;
     }
 }
 
 #[public]
 impl BroadCastApp {
-    pub fn send_message(&mut self, content: String, name: String) -> U256 {
+    pub fn send_message(
+        &mut self,
+        content: String,
+        name: String,
+        date: u128,
+        replying: String,
+    ) -> U256 {
         let num = self.number_of_messages.get();
-        let current_time = U256::from(block::timestamp());
 
         let mut message = self.data.setter(num);
 
         message.content.set_str(content);
         message.sender.set(msg::sender());
-        message.time_stamp.set(current_time);
         message.name.set_str(name);
+        message.time_stamp.set(U128::from(date));
+        message.replying.set_str(replying);
 
-        self.number_of_messages.set(num + U256::from(1));
-        self.number_of_messages.get()
+        self.number_of_messages.set(num + U64::from(1));
+        U256::from(self.number_of_messages.get())
     }
 
     pub fn get_recent_messages(&self) -> String {
@@ -42,7 +49,7 @@ impl BroadCastApp {
         let num = self.number_of_messages.get();
         let mut first = true;
         for i in 0..201 {
-            let current = U256::from(200 - i);
+            let current = U64::from(200 - i);
             if current >= num {
                 continue;
             }
@@ -54,16 +61,54 @@ impl BroadCastApp {
                 first = false;
             }
 
+            let mut stars = String::from("[");
+            let mut stars_first = true;
+
+            for j in 0..255 {
+                let key = U8::from(j);
+                let star = message.stars.get(key);
+                if star.is_empty() {
+                    break;
+                }
+                if !stars_first {
+                    stars.push_str(",");
+                } else {
+                    stars_first = false;
+                }
+                stars.push_str(&format!("\"{}\"", star.get_string()));
+            }
+            stars.push_str("]");
+
             total_messages.push_str(&format!(
-                "{{\"sender\":\"{}\",\"content\":\"{}\",\"name\":\"{}\",\"timestamp\":\"{}\"}}",
+                "{{\"sender\":\"{}\",\"replying\":\"{}\",\"content\":\"{}\",\"name\":\"{}\",\"timestamp\":\"{}\",\"stars\":{}}}",
                 message.sender.get().to_string(),
+                message.replying.get_string().replace("\"", "\\\""),
                 message.content.get_string().replace("\"", "\\\""),
                 message.name.get_string().replace("\"", "\\\""),
-                message.time_stamp.get().to_string()
+                message.time_stamp.get().to_string(),
+                stars
             ));
         }
         total_messages.push_str("]");
         total_messages
+    }
+
+    pub fn react_to_message(&mut self, message_id: u64) -> bool {
+        let mut message = self.data.setter(U64::from(message_id));
+        let sender = msg::sender().to_string();
+
+        for i in 0..255 {
+            let key = U8::from(i);
+            if message.stars.get(key).is_empty() {
+                message.stars.setter(key).set_str(&sender);
+                return true;
+            }
+            if message.stars.get(key).get_string() == sender {
+                message.stars.setter(key).set_str("");
+                return true;
+            }
+        }
+        false
     }
 }
 
